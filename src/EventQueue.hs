@@ -19,10 +19,10 @@ import GameState (Movement (..))
 import qualified GameState as Snake
 import System.IO (hReady, stdin)
 
--- | The are two kind of events, a `ClockEvent`, representing movement which is not force by the user input, and `UserEvent` which is the opposite.
+-- | The are two kind of events, a `ClockEvent`, representing movement which is not forced by the user input, and `UserEvent` which is the opposite.
 data Event = Tick | UserEvent Snake.Movement
 
--- | the `UserInputQueue` is an asynchronous bounded channel which contains snake movements. This channel is feeded by key strokes
+-- | the `UserInputQueue` is an asynchronous bounded channel which contains snake movements. This channel is fed by key strokes
 type UserInputQueue = BoundedChan Snake.Movement
 
 -- | The `EventQueue` has a `UserInputQueue` and the global speed of consumption (as a mutable reference) and the initial speed of the game.
@@ -39,7 +39,7 @@ data EventQueue = EventQueue
 --   The speed is increased by 10% every 10 points, up to 50 points.
 calculateSpeed :: Int -> Int -> Int
 calculateSpeed score initialSpeed =
-  let level = min score 50 `quot` 10 -- maximun of 5 levels every 10 apples
+  let level = min score 50 `quot` 10 -- maximum of 5 levels every 10 apples
       speedFactor = 1 - fromIntegral level / 10.0 -- every level speeds up the time by a 10%
    in floor @Double $ fromIntegral initialSpeed * speedFactor
 
@@ -88,24 +88,12 @@ writeUserInput queue@(EventQueue userqueue _ _) = do
 - wasd are common in games
 -}
 parseUserInput :: String -> Maybe Snake.Movement
-
-parseUserInput "\ESC[A" = Just Snake.North
-parseUserInput "w" = Just Snake.North
-parseUserInput "k" = Just Snake.North
-
-parseUserInput "\ESC[D" = Just Snake.West
-parseUserInput "a" = Just Snake.West
-parseUserInput "h" = Just Snake.West
-
-parseUserInput "\ESC[C" = Just Snake.East
-parseUserInput "d" = Just Snake.East
-parseUserInput "l" = Just Snake.East
-
-parseUserInput "\ESC[B" = Just Snake.South
-parseUserInput "s" = Just Snake.South
-parseUserInput "j" = Just Snake.South
-
-parseUserInput _ = Nothing
+parseUserInput input
+    | input `elem` ["\ESC[A", "w", "k"] = Just Snake.North
+    | input `elem` ["\ESC[D", "a", "h"] = Just Snake.West
+    | input `elem` ["\ESC[C", "d", "l"] = Just Snake.East
+    | input `elem` ["\ESC[B", "s", "j"] = Just Snake.South
+    | otherwise = Nothing
 
 -- | Read the EventQueue and generates an Event to pass to the user logic
 readEvent :: EventQueue -> IO Event

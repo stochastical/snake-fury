@@ -12,7 +12,7 @@ import EventQueue (
   readEvent,
   writeUserInput,
  )
-import GameState (GameState (movement), move, opositeMovement)
+import GameState (GameState (movement), move, oppositeMovement)
 import Initialization (gameInitialization)
 import RenderState (BoardInfo, RenderState (gameOver), render, updateRenderState)
 import System.Environment (getArgs)
@@ -33,7 +33,7 @@ gameloop binf gstate rstate queue = do
         case event of
           Tick -> move binf gstate
           UserEvent m ->
-            if movement gstate == opositeMovement m
+            if movement gstate == oppositeMovement m
               then move binf gstate
               else move binf $ gstate{movement = m}
   let rstate' = updateRenderState rstate delta
@@ -41,7 +41,7 @@ gameloop binf gstate rstate queue = do
   putStr "\ESC[2J" --This cleans the console screen
   putStr $ render binf rstate'
   unless isGameOver $ gameloop binf gstate' rstate' queue
-
+  
 -- | main.
 main :: IO ()
 main = do
@@ -52,7 +52,7 @@ main = do
   hSetBuffering stdout NoBuffering
   hSetBinaryMode stdout True
 
-  -- Game Initializacion
+  -- Game Initialisation
   [h, w, fps] <- fmap read <$> getArgs
   let timeSpeed = 1_000_000 `div` fps -- One second is 1_000_000 microseconds, which is the unit used by GHC internally.
   (binf, gameState, renderState, eventQueue) <- gameInitialization h w timeSpeed
@@ -61,3 +61,4 @@ main = do
   _ <- forkIO $ writeUserInput eventQueue
   let initialState = gameState
   gameloop binf initialState renderState eventQueue
+  putStrLn "Game Over!"
