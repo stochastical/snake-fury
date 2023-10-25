@@ -21,12 +21,14 @@ data Movement = North | South | East | West
 -- TODO: Is there a way to enforce a non-empty sequence? that would msake pattern deconstruction significantly easier....
 data SnakeSeq = SnakeSeq {snakeHead :: Point, snakeBody :: Seq Point}
     deriving (Show, Eq)
+    
+-- data Asset t = Asset t (t is some Property)
 
 -- | The GameState represents all important bits in the game. The Snake, the apple, the current direction of movement and 
 --   a random seed to calculate the next random apple.
 data GameState = GameState
   { snakeSeq :: SnakeSeq
-  , applePosition :: Point -- > refactor: Asset Location
+  , applePosition :: Point -- > refactor: [Asset Location]
   , movement :: Movement
   , randomGen :: StdGen
   }
@@ -65,7 +67,7 @@ makeRandomPoint :: BoardInfo -> StdGen -> (Point, StdGen)
 ---the ttypes start to model the domain, the code models/implements the logic/functions on the data domain
 makeRandomPoint (BoardInfo h w) sg = (newPoint , g1')
   where (g1, g2)  = split sg
-        (x, g1') = uniformR (1, h) g1
+        (x, g1')  = uniformR (1, h) g1
         (y, _g2') = uniformR (1, w) g2
         newPoint  = (x, y)
          --todo: neater way? need to pass gen of gen
