@@ -1,4 +1,5 @@
 {-# LANGUAGE NumericUnderscores #-}
+{-# LANGUAGE OverloadedRecordDot #-}
 
 module Main where
 
@@ -8,13 +9,14 @@ import Control.Concurrent (
  )
 import EventQueue (
   Event (Tick, UserEvent),
-  EventQueue (initialSpeed),
+  EventQueue,
   readEvent,
   writeUserInput,
+  setSpeed
  )
-import GameState (GameState (movement), move, oppositeMovement)
+import GameState (GameState (..), move, oppositeMovement)
 import Initialization (gameInitialization)
-import RenderState (BoardInfo, RenderState (gameOver), render, updateRenderState)
+import RenderState (BoardInfo, RenderState (..), render, updateMessages)
 import System.Environment (getArgs)
 import System.IO (BufferMode (NoBuffering), hSetBinaryMode, hSetBuffering, hSetEcho, stdin, stdout)
 import Control.Monad (unless)
@@ -27,7 +29,8 @@ import Control.Monad (unless)
 --   - Render into the console
 gameloop :: BoardInfo -> GameState -> RenderState -> EventQueue -> IO ()
 gameloop binf gstate rstate queue = do
-  threadDelay $ initialSpeed queue
+  new_speed <- setSpeed rstate.score queue
+  threadDelay $ new_speed -- queue.initialSpeed
   event <- readEvent queue
   let (delta, gstate') =
         case event of
@@ -36,8 +39,8 @@ gameloop binf gstate rstate queue = do
             if movement gstate == oppositeMovement m
               then move binf gstate
               else move binf $ gstate{movement = m}
-  let rstate' = updateRenderState rstate delta
-      isGameOver = gameOver rstate'
+  let rstate' = updateMessages rstate delta
+      isGameOver = rstate'.gameOver
   putStr "\ESC[2J" --This cleans the console screen
   putStr $ render binf rstate'
   unless isGameOver $ gameloop binf gstate' rstate' queue

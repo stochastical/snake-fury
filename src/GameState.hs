@@ -164,16 +164,17 @@ newApple boardInfo (GameState snake oldApplePos _ gen) =
 -}
 -- TODO: check direction to know wherhher to take head or tail?
 --todo: update snake, then send the snake's render as a de;ta to the board
-move :: BoardInfo -> GameState -> (Board.RenderMessage , GameState)
+move :: BoardInfo -> GameState -> ([Board.RenderMessage] , GameState)
 move boardInfo gs@(GameState (SnakeSeq snakeHead snakeBody) apple m gen)
-    | snakeHead' `elem` snakeBody = (Board.GameOver, gs)
+    | snakeHead' `elem` snakeBody = ([Board.GameOver], gs)
     | snakeHead' == apple = --or snakeHead' == apple ? (subtle difference, update before/afyer, race condition...)
         let (apple', gen') = newApple boardInfo gs
             snake' = case snakeBody of
                 S.Empty   -> SnakeSeq snakeHead' (S.singleton snakeHead)
                 _         -> SnakeSeq snakeHead' (snakeHead S.:<| snakeBody) --or snakeBody@(h S.:<| t), make explicit non-empty by destructuring.., or _
             snakeDelta = [(snakeHead, Board.Snake), (apple', Board.Apple)]
-        in (Board.RenderBoard (snakeHead'Delta : snakeDelta), GameState snake' apple' m gen') --want to name this gs', but how?
+        in ([Board.RenderBoard (snakeHead'Delta : snakeDelta), Board.ScoreUpdate 1], GameState snake' apple' m gen') --want to name this gs', but how?
+        --todo: remove the 10 pts ...
     | otherwise =
         let (snake', snakeDelta) = case snakeBody of
                 S.Empty            -- isn't that just no update?? i.e. `snake' = snake {snakeHead=snakeHead'}` is the same
@@ -182,7 +183,7 @@ move boardInfo gs@(GameState (SnakeSeq snakeHead snakeBody) apple m gen)
                     -> (SnakeSeq snakeHead' (S.singleton snakeHead), [(snakeHead, Board.Snake), (h, Board.Empty)])
                 (h S.:<| (mid S.:|> end))  --warning:: not actually sure what this means!!! drop last, move newHead in (xs=(h2)? is /2nd from first right?/, right?)
                     -> (SnakeSeq snakeHead' (snakeHead S.:<| h S.:<| mid), [(snakeHead, Board.Snake), (end, Board.Empty)])
-        in (Board.RenderBoard (snakeHead'Delta : snakeDelta), GameState snake' apple m gen) --always update the snakehead regardless...
+        in ([Board.RenderBoard (snakeHead'Delta : snakeDelta)], GameState snake' apple m gen) --always update the snakehead regardless...
     where snakeHead' = nextHead boardInfo gs -- this happens every move increment, regardless of anything else
           snakeHead'Delta = (snakeHead', Board.SnakeHead)
 

@@ -39,7 +39,7 @@ data EventQueue = EventQueue
 --   The speed is increased by 10% every 10 points, up to 50 points.
 calculateSpeed :: Int -> Int -> Int
 calculateSpeed score initialSpeed =
-  let level = min score 50 `quot` 10 -- maximum of 5 levels every 10 apples
+  let level = min score (50 `quot` 10) -- maximum of 5 levels every 10 apples
       speedFactor = 1 - fromIntegral level / 10.0 -- every level speeds up the time by a 10%
    in floor @Double $ fromIntegral initialSpeed * speedFactor
 

@@ -57,11 +57,11 @@ type DeltaBoard = [(Point, CellType)]
 -- | The render message represent all message the GameState can send to the RenderState
 --   Right now Possible messages are a RenderBoard with a payload indicating which cells change
 --   or a GameOver message.
-data RenderMessage = RenderBoard DeltaBoard | GameOver
+data RenderMessage = RenderBoard DeltaBoard | GameOver | ScoreUpdate Int
     deriving (Show, Eq)
 
 -- | The RenderState contains the board and if the game is over or not.
-data RenderState   = RenderState {board :: Board, gameOver :: Bool}
+data RenderState   = RenderState {board :: Board, gameOver :: Bool, score :: Int}
     deriving (Show, Eq)
 
 -- | Given The board info, this function should return a board with all Empty cells
@@ -87,7 +87,8 @@ buildInitialBoard
 buildInitialBoard boardInfo initialSnakePoint initialApplePoint =
     RenderState {
         board = emptyGrid boardInfo // [(initialSnakePoint, SnakeHead), (initialApplePoint, Apple)],
-        gameOver = False
+        gameOver = False,
+        score = 0
     }
 
 {- Test for buildInitialBoard.
@@ -100,10 +101,17 @@ RenderState {board = array ((1,1),(2,2)) [((1,1),SnakeHead),((1,2),Empty),((2,1)
 
 -- | Given the current render state, and a message -> update the render state
 updateRenderState :: RenderState -> RenderMessage -> RenderState
-updateRenderState renderState GameOver
-    = renderState {gameOver = True}
-updateRenderState oldState@(RenderState oldBoard _) (RenderBoard deltaBoard)
-    = oldState {board = oldBoard // deltaBoard}
+updateRenderState oldState@(RenderState oldBoard _ _) message = case message of
+    GameOver                 -> oldState {gameOver = True}
+    (ScoreUpdate scoreIncrease)      -> oldState {score = oldState.score + scoreIncrease} --ambiguous with score=score+score... (+= in Haskell?)
+    (RenderBoard deltaBoard) -> oldState {board = oldBoard // deltaBoard}
+
+-- what we're essentially trying to do here is **chain record updates**... that is an interesting problem
+--todo: class & ADT & functionn diagrams.... (would make a good blog post, how to generate auotmatic mermaid diagrams of ADTs and defined functions from HLS symbols & parse tree..)
+updateMessages :: RenderState -> [RenderMessage] -> RenderState
+-- updateMessages initialState updates = foldl updateRenderState initialState updates ----ooooooh that's beautiful! (and if I go foldl to foldr, I get stack instead of queue!)
+updateMessages = foldl' updateRenderState ----ooooooh that's beautiful! (and if I go foldl to foldr, I get stack instead of queue!)
+
 
 {-
 This is a test for updateRenderState
@@ -132,10 +140,13 @@ RenderState {board = array ((1,1),(2,2)) [((1,1),SnakeHead),((1,2),Empty),((2,1)
 --todo: unicode boxes
 ppCell :: CellType -> String
 ppCell cell = case cell of
-    Empty     -> "-"
+    Empty     -> "- "
     Snake     -> "\x1b[32m"   ++ "T" ++ "\x1b[0m "
     SnakeHead -> "\x1b[1;32m" ++ "$" ++ "\x1b[0m " --colour SnakeHead green "\x1b[32m$\x1b[0m"
     Apple     -> "\x1b[31m"   ++ "X" ++ "\x1b[0m "
+
+ppScore :: Int -> String
+ppScore score = "The current score is: " ++ show score
 
 -- | convert the RenderState in a String ready to be flushed into the console.
 --   It should return the Board with a pretty look. If game over, return the empty board.
@@ -148,16 +159,16 @@ ppCell cell = case cell of
 --         -- fmap ppCell board
 --         -- rowEnds = [(row, width) | row <- [1..height]] --TODO: Simplify
 
+--change to Renderable Score, Renderable Cell etc and add implements/Show instance, then can concatMap "\n" acros all.. [Renderable t]
 render :: BoardInfo -> RenderState -> String
--- render2 boardInfo@(BoardInfo _height width) (RenderState _ True) =
---     insertAtN (2*width) '\n' (concatMap ppCell (emptyGrid boardInfo)) ++ ['\n'] --todo refactor
-render (BoardInfo height width) (RenderState board _) =
+render (BoardInfo height width) (RenderState board _ score) = --todo: add render for score
     let condition :: (Point, CellType) -> String
         condition (index, cell)
             | index `elem` [(row, width) | row <- [1..height]] = ppCell cell ++ ['\n']
             | otherwise = ppCell cell
-        board' = update board condition 
-    in concat board' --concatMap condition (assocs board)
+        board' = update board condition
+    in ppScore score 
+       ++ "\n\n" ++ concat board' --concatMap condition (assocs board) 
 
 -- todo: haskell function, update, that operates on array's index and value, for updating
 -- that is, a fmap over both indexer and element...
