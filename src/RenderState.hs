@@ -1,5 +1,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE BangPatterns #-}
+{-# LANGUAGE OverloadedRecordDot #-} --todo
+{-# LANGUAGE RankNTypes #-}
 
 -- todo refactor: get rid of BoardInfo, access directly from board Array and pass Snake & Board directly into GameState
 
@@ -30,7 +32,7 @@ module RenderState where
 -- TODO: #type maniulations visualisations blog (concat map, fmap...)
 
 -- This are all imports you need. Feel free to import more things.
-import Data.Array ( (//), listArray, Array, elems )
+import Data.Array ( (//), listArray, Array, elems, Ix, assocs, bounds, array, indices )
 import Data.Foldable ( foldl' )
 import Data.List ( intercalate, unfoldr )
 
@@ -64,7 +66,9 @@ data RenderState   = RenderState {board :: Board, gameOver :: Bool}
 
 -- | Given The board info, this function should return a board with all Empty cells
 emptyGrid :: BoardInfo -> Board
-emptyGrid (BoardInfo height width) = listArray ((1,1), (height, width)) (replicate (height*width) Empty)
+emptyGrid (BoardInfo height width) = listArray (lowerBound, upperBound) (replicate (height*width) Empty)
+    where (lowerBound, upperBound) = ((1,1), (height, width))
+
 
 {-
 This is a test for emptyGrid. It should return 
@@ -125,29 +129,59 @@ RenderState {board = array ((1,1),(2,2)) [((1,1),SnakeHead),((1,2),Empty),((2,1)
 --     SnakeHead -> "$ "
 --     Apple -> "X "
 --   In other to avoid shrinking, I'd recommend to use some character followed by an space.
+--todo: unicode boxes
 ppCell :: CellType -> String
 ppCell cell = case cell of
-    Empty     -> "- "
-    Snake     -> "0 "
-    SnakeHead -> "\x1b[32m" ++ "$ " ++ "\x1b[0m"
-    Apple     -> "X "
+    Empty     -> "-"
+    Snake     -> "\x1b[32m"   ++ "T" ++ "\x1b[0m "
+    SnakeHead -> "\x1b[1;32m" ++ "$" ++ "\x1b[0m " --colour SnakeHead green "\x1b[32m$\x1b[0m"
+    Apple     -> "\x1b[31m"   ++ "X" ++ "\x1b[0m "
 
 -- | convert the RenderState in a String ready to be flushed into the console.
 --   It should return the Board with a pretty look. If game over, return the empty board.
 
+-- render' :: BoardInfo -> RenderState -> String
+-- render' boardInfo@(BoardInfo _height width) (RenderState _ True) =
+--     insertAtN (2*width) '\n' (concatMap ppCell (emptyGrid boardInfo)) ++ ['\n'] --todo refactor
+-- render' (BoardInfo _height width) (RenderState board _) =
+--     insertAtN (2*width) '\n' (concatMap ppCell board) ++ ['\n']
+--         -- fmap ppCell board
+--         -- rowEnds = [(row, width) | row <- [1..height]] --TODO: Simplify
+
 render :: BoardInfo -> RenderState -> String
-render boardInfo@(BoardInfo height width) (RenderState _ True) =
-    insertAtN (2*width) '\n' (concatMap ppCell (emptyGrid boardInfo)) ++ ['\n'] --todo refactor
+-- render2 boardInfo@(BoardInfo _height width) (RenderState _ True) =
+--     insertAtN (2*width) '\n' (concatMap ppCell (emptyGrid boardInfo)) ++ ['\n'] --todo refactor
 render (BoardInfo height width) (RenderState board _) =
-    insertAtN (2*width) '\n' (concatMap ppCell board) ++ ['\n']
-        -- fmap ppCell board
-        -- rowEnds = [(row, width) | row <- [1..height]] --TODO: Simplify
+    let condition :: (Point, CellType) -> String
+        condition (index, cell)
+            | index `elem` [(row, width) | row <- [1..height]] = ppCell cell ++ ['\n']
+            | otherwise = ppCell cell
+        board' = update board condition 
+    in concat board' --concatMap condition (assocs board)
+
+-- todo: haskell function, update, that operates on array's index and value, for updating
+-- that is, a fmap over both indexer and element...
+-- todotodo: make function and contribute to ghc...!
+-- like with hashmaps...
+-- type signature:
+-- update Idx i => (Array i e) --> (i --> e --> t) --> (Array i t)
+-- TODO: #type maniulations visualisations blog (concat map, fmap...)
+
+update :: Ix i => Array i e -> ((i, e) -> t) -> Array i t
+update a f = listArray (bounds a) (map f (assocs a)) --warning: doesn't enforce size... --or with //
+--uncurry/curry if using i -> e -> t
+
+update2 :: Ix i => Array i e -> ((i, e) -> t) -> Array i t --forall i e t.
+-- update2 a f = a // fmap f (assocs a) --can't do incremental updates, if you're changing the type, need a variable foldl' function!!
+update2 a f = array (bounds a) (zip (indices a) (fmap f (assocs a)))
+
+-- update3 a f = foldl condition (assocs a)
 
 -- Helper function to insert a newline at every n-th character in the board-string (end of row)
 -- don't like this... (should be able to flatMap/concatMap etc...)
 insertAtN :: Int -> t -> [t] -> [t]
 insertAtN n y = intercalate [y] . groups n
-  where groups n = takeWhile (not.null) . unfoldr (Just . splitAt n)
+  where groups n = takeWhile (not . null) . unfoldr (Just . splitAt n)
 
 {-
 This is a test for render. It should return:
