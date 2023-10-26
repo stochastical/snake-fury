@@ -1,4 +1,4 @@
-{-# LANGUAGE OverloadedStrings #-}
+-- {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE OverloadedRecordDot #-} --todo
 {-# LANGUAGE RankNTypes #-}
@@ -35,6 +35,10 @@ module RenderState where
 import Data.Array ( (//), listArray, Array, elems, Ix, assocs, bounds, array, indices )
 import Data.Foldable ( foldl' )
 import Data.List ( intercalate, unfoldr )
+
+-- import qualified Data.ByteString as B
+import qualified Data.ByteString.Builder as B
+import Data.ByteString.Builder (Builder)
 
 -- A point is just a tuple of integers.
 type Point = (Int, Int)
@@ -102,9 +106,9 @@ RenderState {board = array ((1,1),(2,2)) [((1,1),SnakeHead),((1,2),Empty),((2,1)
 -- | Given the current render state, and a message -> update the render state
 updateRenderState :: RenderState -> RenderMessage -> RenderState
 updateRenderState oldState@(RenderState oldBoard _ _) message = case message of
-    GameOver                 -> oldState {gameOver = True}
-    (ScoreUpdate scoreIncrease)      -> oldState {score = oldState.score + scoreIncrease} --ambiguous with score=score+score... (+= in Haskell?)
-    (RenderBoard deltaBoard) -> oldState {board = oldBoard // deltaBoard}
+    GameOver                    -> oldState {gameOver = True}
+    (ScoreUpdate scoreIncrease) -> oldState {score = oldState.score + scoreIncrease} --ambiguous with score=score+score... (+= in Haskell?)
+    (RenderBoard deltaBoard)    -> oldState {board = oldBoard // deltaBoard}
 
 -- what we're essentially trying to do here is **chain record updates**... that is an interesting problem
 --todo: class & ADT & functionn diagrams.... (would make a good blog post, how to generate auotmatic mermaid diagrams of ADTs and defined functions from HLS symbols & parse tree..)
@@ -138,15 +142,16 @@ RenderState {board = array ((1,1),(2,2)) [((1,1),SnakeHead),((1,2),Empty),((2,1)
 --     Apple -> "X "
 --   In other to avoid shrinking, I'd recommend to use some character followed by an space.
 --todo: unicode boxes
-ppCell :: CellType -> String
+--note: if u use overloaded strings then below works ok with builder without stringUtf8, but how to specify encoding?
+ppCell :: CellType -> Builder
 ppCell cell = case cell of
-    Empty     -> "- "
-    Snake     -> "\x1b[32m"   ++ "T" ++ "\x1b[0m "
-    SnakeHead -> "\x1b[1;32m" ++ "$" ++ "\x1b[0m " --colour SnakeHead green "\x1b[32m$\x1b[0m"
-    Apple     -> "\x1b[31m"   ++ "X" ++ "\x1b[0m "
+    Empty     -> B.stringUtf8 "- "
+    Snake     -> B.stringUtf8 "\x1b[32mT\x1b[0m "
+    SnakeHead -> B.stringUtf8 "\x1b[1;32m$\x1b[0m " --colour SnakeHead green "\x1b[32m$\x1b[0m"
+    Apple     -> B.stringUtf8 "\x1b[31mX\x1b[0m "
 
-ppScore :: Int -> String
-ppScore score = "The current score is: " ++ show score
+ppScore :: Int -> Builder
+ppScore score = B.stringUtf8 "The current score is: " <> B.intDec score --stringUtf8 vs fromString vs just using <> (bit to string builder?)
 
 -- | convert the RenderState in a String ready to be flushed into the console.
 --   It should return the Board with a pretty look. If game over, return the empty board.
@@ -157,18 +162,32 @@ ppScore score = "The current score is: " ++ show score
 -- render' (BoardInfo _height width) (RenderState board _) =
 --     insertAtN (2*width) '\n' (concatMap ppCell board) ++ ['\n']
 --         -- fmap ppCell board
---         -- rowEnds = [(row, width) | row <- [1..height]] --TODO: Simplify
+--         -- rowEnds = [(row, width) | row<- [1..height]] --TODO: Simplify
 
 --change to Renderable Score, Renderable Cell etc and add implements/Show instance, then can concatMap "\n" acros all.. [Renderable t]
-render :: BoardInfo -> RenderState -> String
+--Option 1: Foldl over the board and incrementally increment the byte string'
+--Option 2: Map each element in the board to a bytestring, then concat all results together
+render :: BoardInfo -> RenderState -> Builder
+-- render (BoardInfo height width) (RenderState board _ score) = --todo: add render for score
+--     let condition :: (Point, CellType) -> String
+--         condition (index, cell)
+--             | index `elem` [(row, width) | row <- [1..height]] = ppCell cell <> "\n"
+--             | otherwise = ppCell cell
+--         board' = foldl' ((<>) . condition) (stringUtf8 "") (assocs board)--update board condition
+--     in ppScore score
+--        <> "\n\n" <> concat board' --concatMap condition (assocs board) 
 render (BoardInfo height width) (RenderState board _ score) = --todo: add render for score
-    let condition :: (Point, CellType) -> String
+    let condition :: (Point, CellType) -> Builder
         condition (index, cell)
-            | index `elem` [(row, width) | row <- [1..height]] = ppCell cell ++ ['\n']
+            | index `elem` [(row, width) | row <- [1..height]] = ppCell cell <> B.charUtf8 '\n'
             | otherwise = ppCell cell
         board' = update board condition
-    in ppScore score 
-       ++ "\n\n" ++ concat board' --concatMap condition (assocs board) 
+    in ppScore score
+       <> B.stringUtf8 "\n\n"
+       <> foldl' (<>) (B.stringUtf8 "") board' --concatMap condition (assocs board) 
+
+
+-- t' = stringUtf8
 
 -- todo: haskell function, update, that operates on array's index and value, for updating
 -- that is, a fmap over both indexer and element...

@@ -20,6 +20,7 @@ import RenderState (BoardInfo, RenderState (..), render, updateMessages)
 import System.Environment (getArgs)
 import System.IO (BufferMode (NoBuffering), hSetBinaryMode, hSetBuffering, hSetEcho, stdin, stdout)
 import Control.Monad (unless)
+import Data.ByteString.Builder (hPutBuilder)
 
 -- The game loop is easy:
 --   - wait some time
@@ -30,7 +31,7 @@ import Control.Monad (unless)
 gameloop :: BoardInfo -> GameState -> RenderState -> EventQueue -> IO ()
 gameloop binf gstate rstate queue = do
   new_speed <- setSpeed rstate.score queue
-  threadDelay $ new_speed -- queue.initialSpeed
+  threadDelay new_speed
   event <- readEvent queue
   let (delta, gstate') =
         case event of
@@ -41,8 +42,8 @@ gameloop binf gstate rstate queue = do
               else move binf $ gstate{movement = m}
   let rstate' = updateMessages rstate delta
       isGameOver = rstate'.gameOver
-  putStr "\ESC[2J" --This cleans the console screen
-  putStr $ render binf rstate'
+  putStr "\ESC[2J" --This cleans the console screen    
+  hPutBuilder stdout $ render binf rstate'
   unless isGameOver $ gameloop binf gstate' rstate' queue
   
 -- | main.

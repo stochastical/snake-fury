@@ -100,5 +100,5 @@ readEvent :: EventQueue -> IO Event
 readEvent (EventQueue userqueue _ _) = do
   mv <- tryReadChan userqueue
   case mv of
-    Nothing -> pure Tick
+    Nothing   -> pure Tick
     Just move -> return $ UserEvent move

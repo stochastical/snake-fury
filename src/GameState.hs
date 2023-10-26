@@ -136,6 +136,7 @@ newApple boardInfo (GameState snake oldApplePos _ gen) =
     let validPoint (randomPt, _) = not (randomPt `inSnake` snake) && randomPt /= oldApplePos
     in until validPoint (makeRandomPoint boardInfo . snd) (makeRandomPoint boardInfo gen)
     -- function *inside* random  state... --unpack tuple result instead of snd (aka 'naming' snd) (\(num,gen' )-> gen')
+    --todo: is this actually correct? or do I need ti call makeRandomPoint instead of self?
 
 {- We can't test this function because it depends on makeRandomPoint -}
 
